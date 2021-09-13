@@ -4,42 +4,65 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Discord;
 using Discord.WebSocket;
+using DiscordBot.Commands;
+using DiscordBot.Helpers;
 
 namespace DiscordBot.Services
 {
-    public class CommandHandlingService
+    public class CommandService
     {
         private readonly DiscordSocketClient _discord;
         private readonly IServiceProvider _services;
-        private List<CommandModuleBase> _modules;
+        private readonly List<CommandModuleBase> _modules;
         
-        public CommandHandlingService(IServiceProvider services)
+        public CommandService(IServiceProvider services)
         {
             _discord = services.GetRequiredService<DiscordSocketClient>();
             _services = services;
-
+            
             _discord.InteractionCreated += Client_InteractionCreated;
             _discord.JoinedGuild += BuildModules;
             
             _modules = new List<CommandModuleBase>();
+        }
+
+        public async Task IntializeAsync()
+        {
             foreach (var module in GetModules())
             {
                 if (module != null)
+                {
                     _modules.Add(module);
+                }
             }
         }
 
         private IEnumerable<CommandModuleBase> GetModules()
         {
+            // Generics are fun :D
             IEnumerable<CommandModuleBase> modules = typeof(CommandModuleBase)
                 .Assembly.GetTypes()
                 .Where(t => t.IsSubclassOf(typeof(CommandModuleBase)) && !t.IsAbstract)
-                .Select(t => (CommandModuleBase)Activator.CreateInstance(t));
+                .Select(t =>
+                {
+                    // If we have a constructor that needs Services
+                    ConstructorInfo[] constructors = t.GetConstructors();
+                    if (constructors.Length > 0)
+                    {
+                        ConstructorInfo constructor = constructors[0];
+                        ParameterInfo[] parameters = constructor.GetParameters();
+                        object[] args = new object[parameters.Length];
+                        for (int i = 0; i < parameters.Length; i++)
+                            args[i] = _services.GetService(parameters[i].ParameterType);
+                        return (CommandModuleBase) Activator.CreateInstance(t, args);
+                    }
+                    // Such performance
+                    return (CommandModuleBase) Activator.CreateInstance(t);
+                });
             return modules;
         }
-        private async Task BuildModules(SocketGuild guild)
+        public async Task BuildModules(SocketGuild guild)
         {
             // Reflections are god tier
             IEnumerable<CommandModuleBase> modules = GetModules();
@@ -60,7 +83,7 @@ namespace DiscordBot.Services
                 {
                     if (module.Name == command.Data.Name)
                     {
-                        await module.Execute(command);
+                        await module.Execute(new Command(command));
                     }
                 }
             }

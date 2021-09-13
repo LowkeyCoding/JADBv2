@@ -1,26 +1,24 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Discord;
 using Discord.Net;
 using Discord.WebSocket;
+using DiscordBot.Helpers;
 using Newtonsoft.Json;
 
-namespace DiscordBot.Modules
+namespace DiscordBot.Commands
 {
-    public class CommandPing : CommandModuleBase
+    public abstract class CommandModuleBase
     {
-        public CommandPing()
-        {
-            Name = "ping";
-            Description = "returns pong";
-        }
-        
-        public override async Task Build(SocketGuild guild)
+        public string Name;
+        protected string Description;
+
+        public virtual async Task Build(SocketGuild guild)
         {
             var command = new SlashCommandBuilder()
-                .WithName(Name)
-                .WithDescription(Description);
-
+                    .WithName(Name)
+                    .WithDescription(Description);
             try
             {
                 await guild.CreateApplicationCommandAsync(command.Build());
@@ -35,9 +33,6 @@ namespace DiscordBot.Modules
             }
         }
 
-        public override async Task Execute(SocketSlashCommand command)
-        {
-            await command.RespondAsync($"pong");
-        }
+        public abstract Task Execute(Command command);
     }
 }

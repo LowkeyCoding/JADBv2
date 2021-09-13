@@ -10,7 +10,6 @@ namespace DiscordBot
 {
     class Program
     {
-        private readonly DiscordSocketClient _client;
 
         // Discord.Net heavily utilizes TAP for async, so we create
         // an asynchronous context from the beginning.
@@ -31,8 +30,8 @@ namespace DiscordBot
                 await client.LoginAsync(TokenType.Bot, Environment.GetEnvironmentVariable("token"));
                 await client.StartAsync();
 
-                services.GetRequiredService<CommandHandlingService>();
-                
+                await services.GetRequiredService<CommandService>().IntializeAsync();
+
                 // Block the program until it is closed.
                 await Task.Delay(Timeout.Infinite);
             }
@@ -45,20 +44,12 @@ namespace DiscordBot
             return Task.CompletedTask;
         }
 
-        // The Ready event indicates that the client has opened a
-        // connection and it is now safe to access the cache.
-        private Task ReadyAsync()
-        {
-            Console.WriteLine($"{_client.CurrentUser} is connected!");
-
-            return Task.CompletedTask;
-        }
-        
         private ServiceProvider ConfigureServices()
         {
             return new ServiceCollection()
                 .AddSingleton<DiscordSocketClient>()
-                .AddSingleton<CommandHandlingService>()
+                .AddSingleton<CommandService>()
+                .AddSingleton<AudioService>()
                 .BuildServiceProvider();
         }
         
